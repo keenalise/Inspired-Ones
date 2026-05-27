@@ -5,7 +5,7 @@ import { Play, Square, Music, Activity, HelpCircle } from "lucide-react";
 export function PlayMadal() {
   const [tempo, setTempo] = useState<number>(110);
   const [isPlayingPattern, setIsPlayingPattern] = useState(false);
-  const [activePattern, setActivePattern] = useState<"khyali" | "samal">("khyali");
+  const [activePattern, setActivePattern] = useState<"khyali" | "samal" | "bols">("khyali");
   const [currentStep, setCurrentStep] = useState<number>(-1);
   const [lastHitType, setLastHitType] = useState<"dhum" | "tehel" | null>(null);
 
@@ -20,6 +20,31 @@ export function PlayMadal() {
 
   const handleHitTehel = () => {
     synths.playMadalTehel();
+    setLastHitType("tehel");
+    setTimeout(() => setLastHitType(null), 120);
+  };
+
+  // Additional named bols
+  const handleDha = () => {
+    synths.playDha();
+    setLastHitType("dhum");
+    setTimeout(() => setLastHitType(null), 140);
+  };
+
+  const handleTi = () => {
+    synths.playTi();
+    setLastHitType("tehel");
+    setTimeout(() => setLastHitType(null), 120);
+  };
+
+  const handleNa = () => {
+    synths.playNa();
+    setLastHitType("tehel");
+    setTimeout(() => setLastHitType(null), 120);
+  };
+
+  const handleTa = () => {
+    synths.playTa();
     setLastHitType("tehel");
     setTimeout(() => setLastHitType(null), 120);
   };
@@ -51,16 +76,37 @@ export function PlayMadal() {
   // Samal 12 beats simple loop: Dhum -> Tehel -> Tehel -> Dhum -> Tehel -> - -> Dhum -> Dhum -> Tehel
   const SamalArr = ["dhum", "tehel", "", "dhum", "tehel", "tehel", "dhum", "", "tehel", "dhum", "tehel", ""];
 
+  // Custom bols sequence requested: Ghin. Kha-Taang. Taak-Ghin. Ghin-Taang
+  // Map: Ghin/Kha -> "dhum" (left), Taang/Taak -> "tehel" (right)
+  const BolsArr: Array<string | string[]> = [
+    "dhum", // Ghin
+    ["dhum", "tehel"], // Kha-Taang
+    ["tehel", "dhum"], // Taak-Ghin
+    ["dhum", "tehel"], // Ghin-Taang
+  ];
+
   const triggerStep = () => {
-    const arr = activePattern === "khyali" ? KhyaliArr : SamalArr;
+    const arr = activePattern === "khyali" ? KhyaliArr : activePattern === "samal" ? SamalArr : BolsArr;
     stepCountRef.current = (stepCountRef.current + 1) % arr.length;
     setCurrentStep(stepCountRef.current);
 
     const command = arr[stepCountRef.current];
-    if (command === "dhum") {
-      synths.playMadalDhum();
-    } else if (command === "tehel") {
-      synths.playMadalTehel();
+    // handle single or multi-hit steps
+    if (Array.isArray(command)) {
+      // play hits with small stagger for clarity
+      command.forEach((c, i) => {
+        const delay = i * 80; // ms
+        setTimeout(() => {
+          if (c === "dhum") synths.playMadalDhum();
+          else if (c === "tehel") synths.playMadalTehel();
+        }, delay);
+      });
+    } else {
+      if (command === "dhum") {
+        synths.playMadalDhum();
+      } else if (command === "tehel") {
+        synths.playMadalTehel();
+      }
     }
   };
 
@@ -169,6 +215,14 @@ export function PlayMadal() {
         </div>
       </div>
 
+      {/* Quick bol buttons */}
+      <div className="flex gap-2 mb-6">
+        <button onClick={handleDha} className="px-3 py-1 rounded bg-stone-900 border border-stone-800 text-stone-100 text-sm">Dha</button>
+        <button onClick={handleTi} className="px-3 py-1 rounded bg-stone-900 border border-stone-800 text-stone-100 text-sm">Ti</button>
+        <button onClick={handleNa} className="px-3 py-1 rounded bg-stone-900 border border-stone-800 text-stone-100 text-sm">Na</button>
+        <button onClick={handleTa} className="px-3 py-1 rounded bg-stone-900 border border-stone-800 text-stone-100 text-sm">Ta</button>
+      </div>
+
       {/* Traditional Folk Autoplay Sequencer */}
       <div className="bg-stone-950/50 border border-stone-850 rounded-xl p-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
@@ -205,6 +259,17 @@ export function PlayMadal() {
               }`}
             >
               Samal (12 Beats)
+            </button>
+            <button
+              id="pattern-bols-btn"
+              onClick={() => setActivePattern("bols")}
+              className={`text-[10px] px-3 py-1 rounded-md font-medium tracking-wide transition-all ${
+                activePattern === "bols"
+                  ? "bg-amber-800 text-stone-100"
+                  : "text-stone-400 hover:text-stone-200"
+              }`}
+            >
+              Bols Sequence
             </button>
           </div>
         </div>
