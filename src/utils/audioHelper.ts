@@ -38,6 +38,29 @@ class AudioSynthesizer {
    * Procedural synthesis of a Madal Dhum strike (Deep Bass Boom)
    */
   playMadalDhum() {
+    // Try playing a sample from the assets folder first (falls back to synth)
+    try {
+      // Map to left-side bols: Ghin (dhing) and Kha/naa as fallback
+      const candidates = [
+        "../../assets/536027__pbimal__maadal-02-dhing.wav", // dhing ~= ghin (resonant open left)
+        "../../assets/536025__pbimal__maadal-02-naa.wav",  // naa ~= closed left (kha)
+      ];
+      for (const rel of candidates) {
+        try {
+          const url = new URL(rel, import.meta.url).href;
+          const audio = new Audio(url);
+          audio.preload = "auto";
+          const p = audio.play();
+          if (p && typeof p.then === "function") p.catch(() => {});
+          return;
+        } catch (e) {
+          // ignore and try next candidate
+        }
+      }
+    } catch (e) {
+      // continue to synth fallback
+    }
+
     this.init();
     if (!this.ctx) return;
 
@@ -94,6 +117,30 @@ class AudioSynthesizer {
    * Procedural synthesis of a Madal Tehel strike (Sharp Metallic Ring)
    */
   playMadalTehel() {
+    // Try playing a sample from the assets folder first (falls back to synth)
+    try {
+      // Map to right-side bols: Taang (open right) and Taak (closed right)
+      const candidates = [
+        "../../assets/536028__pbimal__maadal-02-taang.wav", // taang (sharp open right)
+        "../../assets/536024__pbimal__maadal-02-taak.wav",  // taak (closed right)
+        "../../assets/536026__pbimal__maadal-02-khat.wav",  // khat (alternate)
+      ];
+      for (const rel of candidates) {
+        try {
+          const url = new URL(rel, import.meta.url).href;
+          const audio = new Audio(url);
+          audio.preload = "auto";
+          const p = audio.play();
+          if (p && typeof p.then === "function") p.catch(() => {});
+          return;
+        } catch (e) {
+          // ignore and try next candidate
+        }
+      }
+    } catch (e) {
+      // continue to synth fallback
+    }
+
     this.init();
     if (!this.ctx) return;
 
@@ -374,6 +421,77 @@ class AudioSynthesizer {
 
     osc.stop(now + 0.9);
     subOsc.stop(now + 0.9);
+  }
+
+  /**
+   * Play named Madal bols (higher-level helpers)
+   * Dha: both left (dhum) and right (tehel) together for deep bass open stroke
+   * Ti: closed right-side tap
+   * Na: open ringing stroke on the right edge
+   * Ta: sharp high-pitched solo strike on the right side
+   */
+  playDha() {
+    // Try playing right + left assets simultaneously
+    try {
+      const left = new URL("../../assets/536027__pbimal__maadal-02-dhing.wav", import.meta.url).href; // ghin/dhing (left open)
+      const right = new URL("../../assets/536028__pbimal__maadal-02-taang.wav", import.meta.url).href; // taang (right open)
+      const a1 = new Audio(left);
+      const a2 = new Audio(right);
+      a1.preload = "auto";
+      a2.preload = "auto";
+      // start both; browsers may require gesture — callers should call from user action
+      a1.play().catch(() => {});
+      a2.play().catch(() => {});
+      return;
+    } catch (e) {
+      // fallback to synth combination
+    }
+
+    // fallback: trigger procedural variants together
+    this.playMadalDhum();
+    setTimeout(() => this.playMadalTehel(), 30);
+  }
+
+  playTi() {
+    try {
+      const rightClosed = new URL("../../assets/536024__pbimal__maadal-02-taak.wav", import.meta.url).href; // taak (closed right)
+      const a = new Audio(rightClosed);
+      a.preload = "auto";
+      a.play().catch(() => {});
+      return;
+    } catch (e) {
+      // fallback
+    }
+    // closed right can be rendered by tehel synth with shorter envelope
+    this.playMadalTehel();
+  }
+
+  playNa() {
+    try {
+      const rightOpen = new URL("../../assets/536028__pbimal__maadal-02-taang.wav", import.meta.url).href; // taang (open right)
+      const a = new Audio(rightOpen);
+      a.preload = "auto";
+      a.play().catch(() => {});
+      return;
+    } catch (e) {
+      // fallback
+    }
+    // fall back to tehel synth for open ringing
+    this.playMadalTehel();
+  }
+
+  playTa() {
+    try {
+      const high = new URL("../../assets/536026__pbimal__maadal-02-khat.wav", import.meta.url).href; // khat (sharp/high)
+      const a = new Audio(high);
+      a.preload = "auto";
+      a.play().catch(() => {});
+      return;
+    } catch (e) {
+      // fallback
+    }
+    // high solo: use tehel synth but with brighter envelope
+    this.playMadalTehel();
   }
 
   /**
