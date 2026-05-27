@@ -13,20 +13,14 @@ class AudioSynthesizer {
   private sarangiGain: GainNode | null = null;
   private sarangiFilter: BiquadFilterNode | null = null;
 
-  constructor() {
-    // Lazy initialized on user gesture to obey browser security rules
-  }
+  constructor() {}
 
   init() {
     if (!this.ctx) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        this.ctx = new AudioContextClass();
-      }
+      if (AudioContextClass) this.ctx = new AudioContextClass();
     }
-    if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume();
-    }
+    if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
   }
 
   getAudioContext(): AudioContext | null {
@@ -34,69 +28,62 @@ class AudioSynthesizer {
     return this.ctx;
   }
 
-  /**
-   * Procedural synthesis of a Madal Dhum strike (Deep Bass Boom)
-   */
-  playMadalDhum() {
-    // Try playing a sample from the assets folder first (falls back to synth)
+  // ── Shared asset loader ──────────────────────────────────────────────────
+  private playAsset(relativePath: string): boolean {
     try {
-      // Map to left-side bols: Ghin (dhing) and Kha/naa as fallback
-      const candidates = [
-        "../../assets/536027__pbimal__maadal-02-dhing.wav", // dhing ~= ghin (resonant open left)
-        "../../assets/536025__pbimal__maadal-02-naa.wav",  // naa ~= closed left (kha)
-      ];
-      for (const rel of candidates) {
-        try {
-          const url = new URL(rel, import.meta.url).href;
-          const audio = new Audio(url);
-          audio.preload = "auto";
-          const p = audio.play();
-          if (p && typeof p.then === "function") p.catch(() => {});
-          return;
-        } catch (e) {
-          // ignore and try next candidate
-        }
-      }
-    } catch (e) {
-      // continue to synth fallback
+      const url = new URL(relativePath, import.meta.url).href;
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      const p = audio.play();
+      if (p && typeof p.then === "function") p.catch(() => {});
+      return true;
+    } catch {
+      return false;
     }
+  }
+
+  // Try a list of asset candidates in order; return true if any played
+  private tryAssets(candidates: string[]): boolean {
+    for (const rel of candidates) {
+      if (this.playAsset(rel)) return true;
+    }
+    return false;
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
+  /** Left-side deep bass stroke — Dhing / Ghin */
+  playMadalDhum() {
+    if (this.tryAssets([
+      "../../assets/536027__pbimal__maadal-02-dhing.wav",
+      "../../assets/536025__pbimal__maadal-02-naa.wav",
+    ])) return;
 
     this.init();
     if (!this.ctx) return;
-
     const now = this.ctx.currentTime;
-    
-    // Sub-bass oscillator
+
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    
     osc.type = "sine";
-    // Pitch sweep downwards mimicking structural tension slide
     osc.frequency.setValueAtTime(140, now);
     osc.frequency.exponentialRampToValueAtTime(55, now + 0.12);
-
     gain.gain.setValueAtTime(0.001, now);
     gain.gain.linearRampToValueAtTime(1.0, now + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
-    // Dynamic lowpass filter to add warm rounded punch
     const filter = this.ctx.createBiquadFilter();
     filter.type = "lowpass";
     filter.frequency.setValueAtTime(180, now);
     filter.frequency.exponentialRampToValueAtTime(80, now + 0.15);
 
-    // Subtle noise slap for the leather strike transient
     const noiseNode = this.createNoiseNode();
     const noiseGain = this.ctx.createGain();
     const noiseFilter = this.ctx.createBiquadFilter();
-
     noiseFilter.type = "bandpass";
     noiseFilter.frequency.setValueAtTime(300, now);
     noiseFilter.Q.setValueAtTime(3, now);
-
     noiseGain.gain.setValueAtTime(0.12, now);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-
     if (noiseNode) {
       noiseNode.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
@@ -108,76 +95,47 @@ class AudioSynthesizer {
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(this.ctx.destination);
-
     osc.start(now);
     osc.stop(now + 0.4);
   }
 
-  /**
-   * Procedural synthesis of a Madal Tehel strike (Sharp Metallic Ring)
-   */
+  /** Right-side sharp treble slap — Taak / Taang */
   playMadalTehel() {
-    // Try playing a sample from the assets folder first (falls back to synth)
-    try {
-      // Map to right-side bols: Taang (open right) and Taak (closed right)
-      const candidates = [
-        "../../assets/536028__pbimal__maadal-02-taang.wav", // taang (sharp open right)
-        "../../assets/536024__pbimal__maadal-02-taak.wav",  // taak (closed right)
-        "../../assets/536026__pbimal__maadal-02-khat.wav",  // khat (alternate)
-      ];
-      for (const rel of candidates) {
-        try {
-          const url = new URL(rel, import.meta.url).href;
-          const audio = new Audio(url);
-          audio.preload = "auto";
-          const p = audio.play();
-          if (p && typeof p.then === "function") p.catch(() => {});
-          return;
-        } catch (e) {
-          // ignore and try next candidate
-        }
-      }
-    } catch (e) {
-      // continue to synth fallback
-    }
+    if (this.tryAssets([
+      "../../assets/536028__pbimal__maadal-02-taang.wav",
+      "../../assets/536024__pbimal__maadal-02-taak.wav",
+      "../../assets/536026__pbimal__maadal-02-khat.wav",
+    ])) return;
 
     this.init();
     if (!this.ctx) return;
-
     const now = this.ctx.currentTime;
 
-    // Treble tone oscillator (ringing high frequency)
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-
     osc.type = "triangle";
     osc.frequency.setValueAtTime(440, now);
     osc.frequency.linearRampToValueAtTime(420, now + 0.04);
-
     gain.gain.setValueAtTime(0.001, now);
     gain.gain.linearRampToValueAtTime(0.7, now + 0.004);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
-    // Over-ring harmoniser for Khari paste chime
     const resonanceOsc = this.ctx.createOscillator();
     const resonanceGain = this.ctx.createGain();
     resonanceOsc.type = "sine";
-    resonanceOsc.frequency.setValueAtTime(1185, now); // Metallic dish harmonic
+    resonanceOsc.frequency.setValueAtTime(1185, now);
     resonanceGain.gain.setValueAtTime(0.001, now);
     resonanceGain.gain.linearRampToValueAtTime(0.35, now + 0.005);
     resonanceGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
-    // Mid-high snap noise frame
     const noiseNode = this.createNoiseNode();
     const noiseFilter = this.ctx.createBiquadFilter();
     const noiseGain = this.ctx.createGain();
-
     noiseFilter.type = "bandpass";
     noiseFilter.frequency.setValueAtTime(2200, now);
     noiseFilter.Q.setValueAtTime(5, now);
     noiseGain.gain.setValueAtTime(0.18, now);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
-
     if (noiseNode) {
       noiseNode.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
@@ -188,133 +146,184 @@ class AudioSynthesizer {
 
     osc.connect(gain);
     gain.connect(this.ctx.destination);
-
     resonanceOsc.connect(resonanceGain);
     resonanceGain.connect(this.ctx.destination);
-
     osc.start(now);
     resonanceOsc.start(now);
-
     osc.stop(now + 0.25);
     resonanceOsc.stop(now + 0.25);
   }
 
-  /**
-   * Start flute sound generation
-   */
+  // ── Khemta Taal individual bol methods ───────────────────────────────────
+
+  /** Dhing — resonant open left bass (beat 1 & 4 of Khemta) */
+  playDhing() {
+    // Dedicated asset first, then fall back to dhum synth
+    if (this.tryAssets([
+      "../../assets/536027__pbimal__maadal-02-dhing.wav",
+    ])) return;
+    this.playMadalDhum();
+  }
+
+  /** Naa — soft open left tone (beat 2 of Khemta) */
+  playNaa() {
+    if (this.tryAssets([
+      "../../assets/536025__pbimal__maadal-02-naa.wav",
+    ])) return;
+    this.playMadalDhum();
+  }
+
+  /** Taang — open ringing right stroke (beat 3 of Khemta) */
+  playTaang() {
+    if (this.tryAssets([
+      "../../assets/536028__pbimal__maadal-02-taang.wav",
+    ])) return;
+    this.playMadalTehel();
+  }
+
+  /** Khat — muted/choked right stroke (beat 5 of Khemta) */
+  playKhat() {
+    if (this.tryAssets([
+      "../../assets/536026__pbimal__maadal-02-khat.wav",
+    ])) return;
+
+    // Synth fallback: short muted tehel-like hit
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.linearRampToValueAtTime(480, now + 0.02);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.5, now + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07); // Short mute envelope
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.09);
+  }
+
+  /** Taak — closed sharp right slap (beat 6 of Khemta) */
+  playTaak() {
+    if (this.tryAssets([
+      "../../assets/536024__pbimal__maadal-02-taak.wav",
+    ])) return;
+    this.playMadalTehel();
+  }
+
+  // ── Named bol helpers (existing, kept intact) ────────────────────────────
+
+  /** Dha: left bass + right open together */
+  playDha() {
+    try {
+      const a1 = new Audio(new URL("../../assets/536027__pbimal__maadal-02-dhing.wav", import.meta.url).href);
+      const a2 = new Audio(new URL("../../assets/536028__pbimal__maadal-02-taang.wav", import.meta.url).href);
+      a1.preload = "auto"; a2.preload = "auto";
+      a1.play().catch(() => {}); a2.play().catch(() => {});
+      return;
+    } catch { /* fallback */ }
+    this.playMadalDhum();
+    setTimeout(() => this.playMadalTehel(), 30);
+  }
+
+  /** Ti: closed right tap */
+  playTi() {
+    if (this.tryAssets(["../../assets/536024__pbimal__maadal-02-taak.wav"])) return;
+    this.playMadalTehel();
+  }
+
+  /** Na: open ringing right edge */
+  playNa() {
+    if (this.tryAssets(["../../assets/536028__pbimal__maadal-02-taang.wav"])) return;
+    this.playMadalTehel();
+  }
+
+  /** Ta: sharp high solo right */
+  playTa() {
+    if (this.tryAssets(["../../assets/536026__pbimal__maadal-02-khat.wav"])) return;
+    this.playMadalTehel();
+  }
+
+  // ── Flute ────────────────────────────────────────────────────────────────
+
   startFlute() {
     this.init();
     if (!this.ctx || this.fluteOsc) return;
-
     const now = this.ctx.currentTime;
 
-    // Flute tone oscillator
     this.fluteOsc = this.ctx.createOscillator();
-    // Warm round triangle combined with soft lowpass
     this.fluteOsc.type = "triangle";
-    this.fluteOsc.frequency.setValueAtTime(587.33, now); // Default D5
+    this.fluteOsc.frequency.setValueAtTime(587.33, now);
 
-    // Multi-staged vibrato parameters
     const vibrato = this.ctx.createOscillator();
     const vibratoGain = this.ctx.createGain();
-    vibrato.frequency.setValueAtTime(5.8, now); // Vocal tremble rate
-    vibratoGain.gain.setValueAtTime(5.2, now); // Tone width deflection
-
+    vibrato.frequency.setValueAtTime(5.8, now);
+    vibratoGain.gain.setValueAtTime(5.2, now);
     vibrato.connect(vibratoGain);
     vibratoGain.connect(this.fluteOsc.frequency);
     vibrato.start(now);
 
-    // Flute gain node
     this.fluteGain = this.ctx.createGain();
     this.fluteGain.gain.setValueAtTime(0.0, now);
 
-    // Warm wood body low-pass filter
     this.fluteFilter = this.ctx.createBiquadFilter();
     this.fluteFilter.type = "lowpass";
     this.fluteFilter.frequency.setValueAtTime(1400, now);
 
-    // Soft breath noise overlay
     const noiseNode = this.createNoiseNode();
     const breathFilter = this.ctx.createBiquadFilter();
     this.fluteNoiseGain = this.ctx.createGain();
-
     breathFilter.type = "bandpass";
     breathFilter.frequency.setValueAtTime(1800, now);
     breathFilter.Q.setValueAtTime(1.5, now);
     this.fluteNoiseGain.gain.setValueAtTime(0.0, now);
-
     if (noiseNode) {
       noiseNode.connect(breathFilter);
       breathFilter.connect(this.fluteNoiseGain);
       this.fluteNoiseGain.connect(this.ctx.destination);
       noiseNode.start(now);
-      // Continuous noise node, won't stop until voice shuts down mapping
     }
 
     this.fluteOsc.connect(this.fluteFilter);
     this.fluteFilter.connect(this.fluteGain);
     this.fluteGain.connect(this.ctx.destination);
-
     this.fluteOsc.start(now);
   }
 
   setFluteFrequency(freq: number) {
-    if (this.ctx && this.fluteOsc) {
+    if (this.ctx && this.fluteOsc)
       this.fluteOsc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.05);
-    }
   }
 
   setFluteIntensity(intensity: number) {
     if (!this.ctx || !this.fluteGain || !this.fluteNoiseGain) return;
     const now = this.ctx.currentTime;
-    
-    // Smooth transition to avoid audible pops and crackles
-    const baseGain = intensity * 0.45;
-    const noiseGainVal = intensity * 0.06;
-
-    this.fluteGain.gain.setTargetAtTime(baseGain, now, 0.08);
-    this.fluteNoiseGain.gain.setTargetAtTime(noiseGainVal, now, 0.08);
+    this.fluteGain.gain.setTargetAtTime(intensity * 0.45, now, 0.08);
+    this.fluteNoiseGain.gain.setTargetAtTime(intensity * 0.06, now, 0.08);
   }
 
   stopFlute() {
     try {
-      if (this.fluteOsc) {
-        this.fluteOsc.stop();
-        this.fluteOsc.disconnect();
-        this.fluteOsc = null;
-      }
-      if (this.fluteGain) {
-        this.fluteGain.disconnect();
-        this.fluteGain = null;
-      }
-      if (this.fluteFilter) {
-        this.fluteFilter.disconnect();
-        this.fluteFilter = null;
-      }
-      if (this.fluteNoiseGain) {
-        this.fluteNoiseGain.disconnect();
-        this.fluteNoiseGain = null;
-      }
-    } catch (e) {
-      console.log("Ignored audio teardown fault", e);
-    }
+      this.fluteOsc?.stop(); this.fluteOsc?.disconnect(); this.fluteOsc = null;
+      this.fluteGain?.disconnect(); this.fluteGain = null;
+      this.fluteFilter?.disconnect(); this.fluteFilter = null;
+      this.fluteNoiseGain?.disconnect(); this.fluteNoiseGain = null;
+    } catch (e) { console.log("Flute teardown", e); }
   }
 
-  /**
-   * Start Sarangi bowed sound simulation
-   */
+  // ── Sarangi ──────────────────────────────────────────────────────────────
+
   startSarangi() {
     this.init();
     if (!this.ctx || this.sarangiOsc) return;
-
     const now = this.ctx.currentTime;
 
-    // Bowing friction produces a rich buzzy Sawtooth wave
     this.sarangiOsc = this.ctx.createOscillator();
     this.sarangiOsc.type = "sawtooth";
-    this.sarangiOsc.frequency.setValueAtTime(220, now); // Base tone A3
+    this.sarangiOsc.frequency.setValueAtTime(220, now);
 
-    // Bow tremble LFO (subtle jitter)
     const tremolo = this.ctx.createOscillator();
     const tremoloGain = this.ctx.createGain();
     tremolo.type = "sine";
@@ -327,7 +336,6 @@ class AudioSynthesizer {
     this.sarangiGain = this.ctx.createGain();
     this.sarangiGain.gain.setValueAtTime(0.0, now);
 
-    // Warm wooden resonant box simulation (notch or resonant bandpass)
     this.sarangiFilter = this.ctx.createBiquadFilter();
     this.sarangiFilter.type = "bandpass";
     this.sarangiFilter.frequency.setValueAtTime(450, now);
@@ -336,182 +344,80 @@ class AudioSynthesizer {
     this.sarangiOsc.connect(this.sarangiFilter);
     this.sarangiFilter.connect(this.sarangiGain);
     this.sarangiGain.connect(this.ctx.destination);
-
     this.sarangiOsc.start(now);
   }
 
   setSarangiFrequency(freq: number) {
-    if (this.ctx && this.sarangiOsc) {
+    if (this.ctx && this.sarangiOsc)
       this.sarangiOsc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.1);
-    }
   }
 
   setSarangiIntensity(level: number) {
-    if (this.ctx && this.sarangiGain) {
+    if (this.ctx && this.sarangiGain)
       this.sarangiGain.gain.setTargetAtTime(level * 0.45, this.ctx.currentTime, 0.1);
-    }
   }
 
   stopSarangi() {
     try {
-      if (this.sarangiOsc) {
-        this.sarangiOsc.stop();
-        this.sarangiOsc.disconnect();
-        this.sarangiOsc = null;
-      }
-      if (this.sarangiGain) {
-        this.sarangiGain.disconnect();
-        this.sarangiGain = null;
-      }
-      if (this.sarangiFilter) {
-        this.sarangiFilter.disconnect();
-        this.sarangiFilter = null;
-      }
-    } catch (e) {
-      console.log("Sarangi teardown ignore", e);
-    }
+      this.sarangiOsc?.stop(); this.sarangiOsc?.disconnect(); this.sarangiOsc = null;
+      this.sarangiGain?.disconnect(); this.sarangiGain = null;
+      this.sarangiFilter?.disconnect(); this.sarangiFilter = null;
+    } catch (e) { console.log("Sarangi teardown", e); }
   }
 
-  /**
-   * Play Murchunga (Jaw Harp) pluck with throat/jaw cavity filtering logic
-   * @param resonanceHarmonic value from 0 to 1 mapping mouth opening size
-   */
+  // ── Murchunga ────────────────────────────────────────────────────────────
+
   playMurchunga(resonanceHarmonic: number) {
     this.init();
     if (!this.ctx) return;
-
     const now = this.ctx.currentTime;
 
-    // Jaw harp fundamental (Low metal buzzing harmonic)
     const osc = this.ctx.createOscillator();
     const subOsc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
     osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(85, now); // Drone fundamental key F2
-
+    osc.frequency.setValueAtTime(85, now);
     subOsc.type = "square";
-    subOsc.frequency.setValueAtTime(170, now); // Double octave resonance
+    subOsc.frequency.setValueAtTime(170, now);
 
     gain.gain.setValueAtTime(0.001, now);
     gain.gain.linearRampToValueAtTime(0.6, now + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.84);
 
-    // Highly critical mouth resonator filter modeling (Wah-wah vocal effect!)
-    // Vary resonance frequency between 350Hz (closed mouth) and 1900Hz (wide open jaw)
     const bandpassFilter = this.ctx.createBiquadFilter();
     bandpassFilter.type = "bandpass";
     const mappedFreq = 380 + resonanceHarmonic * 1620;
     bandpassFilter.frequency.setValueAtTime(mappedFreq, now);
-    // Exponential ramp down representing dampening mouth shape during decay
     bandpassFilter.frequency.exponentialRampToValueAtTime(mappedFreq * 0.75, now + 0.5);
-    bandpassFilter.Q.setValueAtTime(14, now); // Extremely high resonance for metallic twang
+    bandpassFilter.Q.setValueAtTime(14, now);
 
-    // Combine tone structure
     const mixer = this.ctx.createGain();
     osc.connect(mixer);
     subOsc.connect(mixer);
-    
     mixer.connect(bandpassFilter);
     bandpassFilter.connect(gain);
     gain.connect(this.ctx.destination);
 
-    osc.start(now);
-    subOsc.start(now);
-
-    osc.stop(now + 0.9);
-    subOsc.stop(now + 0.9);
+    osc.start(now); subOsc.start(now);
+    osc.stop(now + 0.9); subOsc.stop(now + 0.9);
   }
 
-  /**
-   * Play named Madal bols (higher-level helpers)
-   * Dha: both left (dhum) and right (tehel) together for deep bass open stroke
-   * Ti: closed right-side tap
-   * Na: open ringing stroke on the right edge
-   * Ta: sharp high-pitched solo strike on the right side
-   */
-  playDha() {
-    // Try playing right + left assets simultaneously
-    try {
-      const left = new URL("../../assets/536027__pbimal__maadal-02-dhing.wav", import.meta.url).href; // ghin/dhing (left open)
-      const right = new URL("../../assets/536028__pbimal__maadal-02-taang.wav", import.meta.url).href; // taang (right open)
-      const a1 = new Audio(left);
-      const a2 = new Audio(right);
-      a1.preload = "auto";
-      a2.preload = "auto";
-      // start both; browsers may require gesture — callers should call from user action
-      a1.play().catch(() => {});
-      a2.play().catch(() => {});
-      return;
-    } catch (e) {
-      // fallback to synth combination
-    }
+  // ── Noise utility ────────────────────────────────────────────────────────
 
-    // fallback: trigger procedural variants together
-    this.playMadalDhum();
-    setTimeout(() => this.playMadalTehel(), 30);
-  }
-
-  playTi() {
-    try {
-      const rightClosed = new URL("../../assets/536024__pbimal__maadal-02-taak.wav", import.meta.url).href; // taak (closed right)
-      const a = new Audio(rightClosed);
-      a.preload = "auto";
-      a.play().catch(() => {});
-      return;
-    } catch (e) {
-      // fallback
-    }
-    // closed right can be rendered by tehel synth with shorter envelope
-    this.playMadalTehel();
-  }
-
-  playNa() {
-    try {
-      const rightOpen = new URL("../../assets/536028__pbimal__maadal-02-taang.wav", import.meta.url).href; // taang (open right)
-      const a = new Audio(rightOpen);
-      a.preload = "auto";
-      a.play().catch(() => {});
-      return;
-    } catch (e) {
-      // fallback
-    }
-    // fall back to tehel synth for open ringing
-    this.playMadalTehel();
-  }
-
-  playTa() {
-    try {
-      const high = new URL("../../assets/536026__pbimal__maadal-02-khat.wav", import.meta.url).href; // khat (sharp/high)
-      const a = new Audio(high);
-      a.preload = "auto";
-      a.play().catch(() => {});
-      return;
-    } catch (e) {
-      // fallback
-    }
-    // high solo: use tehel synth but with brighter envelope
-    this.playMadalTehel();
-  }
-
-  /**
-   * Helper utility to design real-time white noise buffer sources
-   */
   private createNoiseNode(): AudioBufferSourceNode | null {
     if (!this.ctx) return null;
     try {
-      const bufferSize = this.ctx.sampleRate * 2; // 2 seconds of buffer
+      const bufferSize = this.ctx.sampleRate * 2;
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
       const noise = this.ctx.createBufferSource();
       noise.buffer = buffer;
       noise.loop = true;
       return noise;
     } catch (e) {
-      console.error("White noise synthesizer buffer fault", e);
+      console.error("Noise buffer fault", e);
       return null;
     }
   }
