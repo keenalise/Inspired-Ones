@@ -1,0 +1,6 @@
+{
+  "name": "Nepali Traditional Instruments",
+  "description": "An interactive digital showroom and playground representing Nepali traditional musical instruments, incorporating AI-powered camera capture identification, and immersive, audio-synthesized physical models of the Madal, Bansuri, Sarangi, and Murchunga.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
