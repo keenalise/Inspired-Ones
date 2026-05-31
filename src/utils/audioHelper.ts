@@ -56,10 +56,27 @@ class AudioSynthesizer {
     }
   }
 
+  // ── Asset loader (Vite-compatible) ──────────────────────────────────────
+
+  private playAsset(path: string): boolean {
+    try {
+      const audio = new Audio(path);
+      audio.preload = "auto";
+      const p = audio.play();
+      if (p && typeof p.then === "function") p.catch(() => {});
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ── Madal ────────────────────────────────────────────────────────────────
 
-  /** Left-side deep bass stroke — Dhing / Ghin */
+  /** Left-side deep bass stroke — Dhing / Ghin (WAV first, synth fallback) */
   playMadalDhum() {
+    if (this.playAsset("/assets/536027__pbimal__maadal-02-dhing.wav")) return;
+    if (this.playAsset("/assets/536025__pbimal__maadal-02-naa.wav")) return;
+
     this.init();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
@@ -101,8 +118,12 @@ class AudioSynthesizer {
     osc.stop(now + 0.4);
   }
 
-  /** Right-side sharp treble slap — Taak / Taang */
+  /** Right-side sharp treble slap — Taak / Taang (WAV first, synth fallback) */
   playMadalTehel() {
+    if (this.playAsset("/assets/536028__pbimal__maadal-02-taang.wav")) return;
+    if (this.playAsset("/assets/536024__pbimal__maadal-02-taak.wav")) return;
+    if (this.playAsset("/assets/536026__pbimal__maadal-02-khat.wav")) return;
+
     this.init();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
@@ -150,13 +171,31 @@ class AudioSynthesizer {
     resonanceOsc.stop(now + 0.25);
   }
 
-  // Named bol methods
-  playDhing() { this.playMadalDhum(); }
-  playNaa()   { this.playMadalDhum(); }
-  playTaang() { this.playMadalTehel(); }
-  playTaak()  { this.playMadalTehel(); }
+  // ── Named bol methods ────────────────────────────────────────────────────
+
+  playDhing() {
+    if (this.playAsset("/assets/536027__pbimal__maadal-02-dhing.wav")) return;
+    this.playMadalDhum();
+  }
+
+  playNaa() {
+    if (this.playAsset("/assets/536025__pbimal__maadal-02-naa.wav")) return;
+    this.playMadalDhum();
+  }
+
+  playTaang() {
+    if (this.playAsset("/assets/536028__pbimal__maadal-02-taang.wav")) return;
+    this.playMadalTehel();
+  }
+
+  playTaak() {
+    if (this.playAsset("/assets/536024__pbimal__maadal-02-taak.wav")) return;
+    this.playMadalTehel();
+  }
 
   playKhat() {
+    if (this.playAsset("/assets/536026__pbimal__maadal-02-khat.wav")) return;
+
     this.init();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
@@ -175,13 +214,31 @@ class AudioSynthesizer {
   }
 
   playDha() {
+    try {
+      const a1 = new Audio("/assets/536027__pbimal__maadal-02-dhing.wav");
+      const a2 = new Audio("/assets/536028__pbimal__maadal-02-taang.wav");
+      a1.preload = "auto"; a2.preload = "auto";
+      a1.play().catch(() => {}); a2.play().catch(() => {});
+      return;
+    } catch { /* fallback */ }
     this.playMadalDhum();
     setTimeout(() => this.playMadalTehel(), 30);
   }
 
-  playTi() { this.playMadalTehel(); }
-  playNa() { this.playMadalTehel(); }
-  playTa() { this.playMadalTehel(); }
+  playTi() {
+    if (this.playAsset("/assets/536024__pbimal__maadal-02-taak.wav")) return;
+    this.playMadalTehel();
+  }
+
+  playNa() {
+    if (this.playAsset("/assets/536028__pbimal__maadal-02-taang.wav")) return;
+    this.playMadalTehel();
+  }
+
+  playTa() {
+    if (this.playAsset("/assets/536026__pbimal__maadal-02-khat.wav")) return;
+    this.playMadalTehel();
+  }
 
   // ── Flute (Bansuri) ──────────────────────────────────────────────────────
 
